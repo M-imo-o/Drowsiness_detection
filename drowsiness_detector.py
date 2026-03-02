@@ -120,7 +120,7 @@ def main():
         print("ERROR: Cannot open webcam.")
         return
 
-    eyes_closed_start = None  # timestamp when eyes first closed
+    eyes_closed_start: float = 0.0  # timestamp when eyes first closed (0 = not closed)
     drowsy = False
     alarm_playing = False
     frame_ts = 0
@@ -147,7 +147,7 @@ def main():
             eyes_closed = ear < EAR_THRESHOLD
 
             if eyes_closed:
-                if eyes_closed_start is None:
+                if eyes_closed_start == 0.0:
                     eyes_closed_start = time.time()
                 elapsed = time.time() - eyes_closed_start
 
@@ -172,7 +172,7 @@ def main():
                                 0.8, (0, 165, 255), 2)
             else:
                 # Eyes open → reset everything
-                eyes_closed_start = None
+                eyes_closed_start = 0.0
                 if drowsy:
                     drowsy = False
                     # Stop the alarm immediately
