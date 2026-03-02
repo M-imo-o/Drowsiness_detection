@@ -14,7 +14,6 @@ import time
 import threading
 import struct
 import wave
-import io
 import os
 import tempfile
 import winsound
@@ -155,9 +154,9 @@ def main():
                 if elapsed >= CLOSED_DURATION_LIMIT and not drowsy:
                     drowsy = True
                     # Play beep WAV in a loop through speakers (async)
-                    winsound.PlaySound(
+                    winsound.PlaySound(  # type: ignore[attr-defined]
                         beep_wav,
-                        winsound.SND_FILENAME | winsound.SND_LOOP | winsound.SND_ASYNC
+                        winsound.SND_FILENAME | winsound.SND_LOOP | winsound.SND_ASYNC  # type: ignore[attr-defined]
                     )
                     alarm_playing = True
                     print("ALARM ON - eyes closed for 5+ seconds!")
@@ -177,7 +176,7 @@ def main():
                 if drowsy:
                     drowsy = False
                     # Stop the alarm immediately
-                    winsound.PlaySound(None, winsound.SND_PURGE)
+                    winsound.PlaySound(None, winsound.SND_PURGE)  # type: ignore[attr-defined]
                     alarm_playing = False
                     print("ALARM OFF - eyes opened.")
 
@@ -197,7 +196,7 @@ def main():
             break
 
     # --- Cleanup ---
-    winsound.PlaySound(None, winsound.SND_PURGE)  # stop any playing sound
+    winsound.PlaySound(None, winsound.SND_PURGE)  # type: ignore[attr-defined]
     cap.release()
     cv2.destroyAllWindows()
     landmarker.close()
