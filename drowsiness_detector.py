@@ -25,6 +25,8 @@ MODEL_PATH = "face_landmarker_v2_with_blendshapes.task"
 ALARM_WAV = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fahhhhh.wav")
 EAR_THRESHOLD = 0.2          # Below this → eyes considered closed
 CLOSED_DURATION_LIMIT = 1.0  # Seconds of closure before alarm
+FLASH_DELAY = 2.0           # Seconds after alarm before flash starts
+FLASH_INTERVAL = 0.1        # Seconds between black/white toggles
 
 # MediaPipe face‑mesh indices for each eye
 LEFT_EYE = [33, 160, 158, 133, 153, 144]
@@ -102,6 +104,10 @@ def main():
     eyes_closed_start: float = 0.0  # timestamp when eyes first closed (0 = not closed)
     drowsy = False
     alarm_playing = False
+    alarm_start_time: float = 0.0   # when the alarm started
+    flash_active = False
+    flash_state = False             # False = black, True = white
+    last_flash_toggle: float = 0.0
     frame_ts = 0
 
     print("Drowsiness Detector started. Press 'q' to quit.")
@@ -138,6 +144,7 @@ def main():
                         winsound.SND_FILENAME | winsound.SND_LOOP | winsound.SND_ASYNC  # type: ignore[attr-defined]
                     )
                     alarm_playing = True
+                    alarm_start_time = time.time()
                     print("ALARM ON - eyes closed for 1+ seconds!")
 
                 # Show countdown / alert
@@ -145,6 +152,25 @@ def main():
                     cv2.putText(frame, "!! DROWSINESS ALERT !!",
                                 (30, h - 60), cv2.FONT_HERSHEY_SIMPLEX,
                                 1.2, (0, 0, 255), 3)
+
+                    # --- Flashing lights (2s after alarm) ---
+                    if time.time() - alarm_start_time >= FLASH_DELAY:
+                        if not flash_active:
+                            flash_active = True
+                            cv2.namedWindow("WAKE UP", cv2.WINDOW_NORMAL)
+                            cv2.setWindowProperty("WAKE UP", cv2.WND_PROP_FULLSCREEN,
+                                                  cv2.WINDOW_FULLSCREEN)
+                            last_flash_toggle = time.time()
+                            print("FLASH ON - flashing lights activated!")
+
+                        # Toggle black ↔ white every FLASH_INTERVAL
+                        now = time.time()
+                        if now - last_flash_toggle >= FLASH_INTERVAL:
+                            flash_state = not flash_state
+                            last_flash_toggle = now
+                        color_val = 255 if flash_state else 0
+                        flash_frame = np.full((800, 1280), color_val, dtype=np.uint8)
+                        cv2.imshow("WAKE UP", flash_frame)
                 else:
                     cv2.putText(frame, f"Eyes closed: {elapsed:.1f}s / {CLOSED_DURATION_LIMIT:.0f}s",
                                 (30, h - 60), cv2.FONT_HERSHEY_SIMPLEX,
@@ -157,6 +183,13 @@ def main():
                     # Stop the alarm immediately
                     winsound.PlaySound(None, winsound.SND_PURGE)  # type: ignore[attr-defined]
                     alarm_playing = False
+                    alarm_start_time = 0.0
+                    # Stop flashing
+                    if flash_active:
+                        flash_active = False
+                        flash_state = False
+                        cv2.destroyWindow("WAKE UP")
+                        print("FLASH OFF - flashing lights stopped.")
                     print("ALARM OFF - eyes opened.")
 
             # EAR readout
@@ -176,6 +209,8 @@ def main():
 
     # --- Cleanup ---
     winsound.PlaySound(None, winsound.SND_PURGE)  # type: ignore[attr-defined]
+    if flash_active:
+        cv2.destroyWindow("WAKE UP")
     cap.release()
     cv2.destroyAllWindows()
     landmarker.close()
