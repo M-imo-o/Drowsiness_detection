@@ -2,7 +2,7 @@
 Drowsiness Detection System
 ============================
 Uses MediaPipe Face Landmarker + Eye Aspect Ratio (EAR) to detect drowsiness.
-When eyes are closed for >= 5 seconds, a beep alarm sounds.
+When eyes are closed for >= 1 second, an alarm sounds.
 The alarm stops immediately when eyes reopen.
 
 Press 'q' to quit.
@@ -12,10 +12,7 @@ import cv2
 import numpy as np
 import time
 import threading
-import struct
-import wave
 import os
-import tempfile
 import winsound
 import mediapipe as mp
 from mediapipe.tasks import python
@@ -25,8 +22,9 @@ from mediapipe.tasks.python import vision
 # Configuration
 # ──────────────────────────────────────────────
 MODEL_PATH = "face_landmarker_v2_with_blendshapes.task"
+ALARM_WAV = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fahhhhh.wav")
 EAR_THRESHOLD = 0.2          # Below this → eyes considered closed
-CLOSED_DURATION_LIMIT = 5.0  # Seconds of closure before alarm
+CLOSED_DURATION_LIMIT = 1.0  # Seconds of closure before alarm
 
 # MediaPipe face‑mesh indices for each eye
 LEFT_EYE = [33, 160, 158, 133, 153, 144]
@@ -38,26 +36,6 @@ RIGHT_EYE = [362, 385, 387, 263, 373, 380]
 latest_ear = None
 latest_landmarks = None
 lock = threading.Lock()
-
-
-# ──────────────────────────────────────────────
-# Generate a WAV beep tone file (plays through speakers)
-# ──────────────────────────────────────────────
-def generate_beep_wav(filepath, freq=2500, duration_ms=600, volume=0.8):
-    """Create a WAV file with a sine-wave beep tone."""
-    sample_rate = 44100
-    n_samples = int(sample_rate * duration_ms / 1000)
-    samples = []
-    for i in range(n_samples):
-        t = i / sample_rate
-        value = volume * 32767 * np.sin(2 * np.pi * freq * t)
-        samples.append(int(value))
-
-    with wave.open(filepath, 'w') as wf:
-        wf.setnchannels(1)
-        wf.setsampwidth(2)
-        wf.setframerate(sample_rate)
-        wf.writeframes(struct.pack(f'<{len(samples)}h', *samples))
 
 
 # ──────────────────────────────────────────────
@@ -97,10 +75,11 @@ def on_result(result, output_image, timestamp_ms):
 # Main
 # ──────────────────────────────────────────────
 def main():
-    # --- Generate alarm WAV file ---
-    beep_wav = os.path.join(tempfile.gettempdir(), "drowsiness_beep.wav")
-    generate_beep_wav(beep_wav, freq=2500, duration_ms=600)
-    print(f"Alarm sound generated: {beep_wav}")
+    # --- Verify alarm sound file exists ---
+    if not os.path.isfile(ALARM_WAV):
+        print(f"ERROR: Alarm sound file not found: {ALARM_WAV}")
+        return
+    print(f"Using alarm sound: {ALARM_WAV}")
 
     # --- MediaPipe Face Landmarker (LIVE_STREAM mode) ---
     base_options = python.BaseOptions(model_asset_path=MODEL_PATH)
@@ -155,11 +134,11 @@ def main():
                     drowsy = True
                     # Play beep WAV in a loop through speakers (async)
                     winsound.PlaySound(  # type: ignore[attr-defined]
-                        beep_wav,
+                        ALARM_WAV,
                         winsound.SND_FILENAME | winsound.SND_LOOP | winsound.SND_ASYNC  # type: ignore[attr-defined]
                     )
                     alarm_playing = True
-                    print("ALARM ON - eyes closed for 5+ seconds!")
+                    print("ALARM ON - eyes closed for 1+ seconds!")
 
                 # Show countdown / alert
                 if drowsy:
